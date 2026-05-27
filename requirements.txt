@@ -1,4 +1,3 @@
-Plaintext
 
 
 fastapi==0.110.0
