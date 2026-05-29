@@ -1,6 +1,5 @@
 
 
-
 import os
 import httpx
 from fastapi import FastAPI, Request, Response
@@ -10,9 +9,13 @@ app = FastAPI()
 
 TOKEN_VERIFICACION = "MiCodigoSecretoMotoDomi2026"
 
-# CREDENCIALES DE META (Cambia esto con tus datos)
+# CREDENCIALES DE META
 PHONE_NUMBER_ID = "1121495151051234"
-META_ACCESS_TOKEN = "EAAdHCjiivpwBRqW0hOXXUrqviedeZAJrv0JEbc9bWZClRXv62ypJnG5zt1VDy7QiFszdHLH7JJ4P4UFkT7NNx9HiGRpqfQeY2ldPHe692g7ZCZCH4LOXGAvko8FVZAkmMneN2wVF2ZBZCa6uY0ls2LyPZCHpZCtb1BzqcMYKaQRtUfuwxmcFggwSqtADqnwSFuV5mDTmJ5WQRWwzXoSaTgA8ZAq4jzFuemNjk77Do182iSe3KRTgX8do79dsezO0cAHtchNlCOtlYFZByPS6O6BESEubdESQqMVZAhnYUj9g4gZDZD"
+META_ACCESS_TOKEN = "EAAdHCjiivpwBRpzRr9dg5nKDK89om6qyTZBMGITa8K7ZARVPNOLmOdZCePnzLlIpecqTZAxAlnfYU3UJ4Th6IVi8OzKf5Eod3uR18Vh7G0XRMjI1KHyUzqvnqEmHrVm4GrxeFTN70w5SbPxXwQFPlkMdo4ZCfPxyBUENx2UeeYeDMbRCnsiQH60LIc6aoa29ZCdb0jjcNDdbkaxPKqL240apDjiG6LerWZBqsyK86DZCZACH8TzwUoLJIElxoqXgW2DLEoaKyX2dZALZCbcLyTnXm3tZCf4JPpLuPvKBWWoZCnAZDZD" 
+
+@app.get("/")
+def inicio():
+    return {"status": "ok", "proyecto": "MOTODOMI24-7"}
 
 @app.get("/webhook")
 async def verificar_webhook(request: Request):
@@ -23,60 +26,58 @@ async def verificar_webhook(request: Request):
     
     if mode and token:
         if mode == "subscribe" and token == TOKEN_VERIFICACION:
-            print("¡Webhook verificado con éxito por Meta!")
+            print("--- WEBHOOK VERIFICADO CON ÉXITO POR META ---")
             return PlainTextResponse(content=challenge, status_code=200)
-        else:
-            return Response(content="Token de verificación inválido", status_code=403)
-            
-    return Response(content="Faltan parámetros", status_code=400)
+    return Response(content="Faltan parámetros o token inválido", status_code=400)
 
 @app.post("/webhook")
 async def recibir_mensajes(request: Request):
     try:
         datos = await request.json()
+        print("--- NUEVO EVENTO RECIBIDO DESDE META ---")
+        print(datos) # Esto nos mostrará el JSON exacto en Render
         
-        if "entry" in datos and datos["entry"]:
-            changes = datos["entry"][0].get("changes", [])
-            if changes and "value" in changes[0]:
-                value = changes[0]["value"]
-                if "messages" in value and value["messages"]:
-                    mensaje_data = value["messages"][0]
-                    
-                    telefono_cliente = mensaje_data.get("from")
-                    texto_mensaje = mensaje_data.get("text", {}).get("body", "")
-                    
-                    print(f"--- NUEVO MENSAJE DE MOTODOMI ---")
-                    print(f"Cliente: {telefono_cliente}")
-                    print(f"Texto: {texto_mensaje}")
-                    print(f"---------------------------------")
-                    
-                    # AQUÍ LE RESPONDEMOS AUTOMÁTICAMENTE
-                    await enviar_respuesta_whatsapp(telefono_cliente, "¡Hola! 🏍️ Bienvenido a MOTODOMI24-7. Tu mensaje fue recibido en nuestro sistema backend. En breve procesaremos tu solicitud.")
-                    
+        # Extracción segura y directa del número de teléfono
+        try:
+            entry = datos.get("entry", [])[0]
+            change = entry.get("changes", [])[0]
+            value = change.get("value", {})
+            
+            # Buscamos el teléfono ya sea de un mensaje o de un estado de entrega
+            telefono_cliente = None
+            if "messages" in value:
+                telefono_cliente = value["messages"][0].get("from")
+            elif "statuses" in value:
+                telefono_cliente = value["statuses"][0].get("recipient_id")
+                
+            if telefono_cliente:
+                print(f"--- ENVIANDO RESPUESTA AUTOMÁTICA AL TELÉFONO: {telefono_cliente} ---")
+                await enviar_respuesta_whatsapp(telefono_cliente)
+                
+        except Exception as e_extract:
+            print(f"No se pudo extraer teléfono de la estructura (evento interno de Meta): {str(e_extract)}")
+            
+        return Response(content="EVENT_RECEIVED", status_code=200)
     except Exception as e:
-        print("Error al procesar el JSON de Meta:", str(e))
-        
-    return {"status": "EVENT_RECEIVED"}
+        print(f"--- ERROR CRÍTICO AL PROCESAR: {str(e)} ---")
+        return Response(content="Error interno", status_code=500)
 
-async def enviar_respuesta_whatsapp(telefono_destino: str, texto_respuesta: str):
-    url = f"https://graph.facebook.com/v25.0/{PHONE_NUMBER_ID}/messages"
+async def enviar_respuesta_whatsapp(telefono):
+    url = f"https://graph.facebook.com/v20.0/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {META_ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
     payload = {
         "messaging_product": "whatsapp",
-        "to": telefono_destino,
+        "to": telefono,
         "type": "text",
-        "text": {"body": texto_respuesta}
+        "text": {
+            "body": "¡Hola! 🏍️ Bienvenido a MOTODOMI24-7.\n\nTu mensaje fue recibido con éxito en nuestro sistema. En un momento uno de nuestros asesores o mototaxistas se pondrá en contacto contigo para coordinar tu servicio.\n\n¡Gracias por confiar en nosotros!"
+        }
     }
     
     async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(url, json=payload, headers=headers)
-            if response.status_code == 200:
-                print(f"Respuesta enviada con éxito a {telefono_destino}")
-            else:
-                print(f"Error al enviar a Meta: {response.status_code} - {response.text}")
-        except Exception as e:
-            print(f"Fallo en la conexión al enviar mensaje: {str(e)}")
+        respuesta = await client.post(url, json=payload, headers=headers)
+        print(f"--- RESPUESTA DE META AL ENVIAR: {respuesta.status_code} ---")
+        print(respuesta.text)
