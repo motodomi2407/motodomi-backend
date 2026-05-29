@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse
 
 app = FastAPI()
 
-TOKEN_VERIFICACION = "MiCodigoSecretoMotoDomi2026"
+TOKEN_VERIFICACION = MiCodigoSecretoMotoDomi2026
 
 @app.get("/webhook")
 async def verificar_webhook(request: Request):
