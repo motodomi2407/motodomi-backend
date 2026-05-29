@@ -29,4 +29,4 @@ async def verificar_webhook(request: Request):
 async def recibir_mensajes(request: Request):
     datos = await request.json()
     print("Mensaje recibido de WhatsApp:", datos)
-    return Response(content="EVENT_RECEIVED", status_code=200)
+   return {"status": "EVENT_RECEIVED"}
