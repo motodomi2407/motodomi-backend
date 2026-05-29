@@ -27,6 +27,28 @@ async def verificar_webhook(request: Request):
 
 @app.post("/webhook")
 async def recibir_mensajes(request: Request):
-    datos = await request.json()
-    print("Mensaje recibido de WhatsApp:", datos)
+    try:
+        datos = await request.json()
+        
+        # Verificamos que el JSON contenga un mensaje válido
+        if "entry" in datos and datos["entry"]:
+            changes = datos["entry"][0].get("changes", [])
+            if changes and "value" in changes[0]:
+                value = changes[0]["value"]
+                if "messages" in value and value["messages"]:
+                    mensaje_data = value["messages"][0]
+                    
+                    # Extraemos la información clave
+                    telefono_cliente = mensaje_data.get("from")
+                    texto_mensaje = mensaje_data.get("text", {}).get("body", "")
+                    
+                    # Lo imprimimos bonito en la consola de Render
+                    print(f"--- NUEVO MENSAJE DE MOTODOMI ---")
+                    print(f"Cliente: {telefono_cliente}")
+                    print(f"Texto: {texto_mensaje}")
+                    print(f"---------------------------------")
+                    
+    except Exception as e:
+        print("Error al procesar el JSON de Meta:", str(e))
+        
     return {"status": "EVENT_RECEIVED"}
