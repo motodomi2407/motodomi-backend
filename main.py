@@ -36,27 +36,37 @@ async def recibir_mensajes(request: Request):
     try:
         datos = await request.json()
         print("--- NUEVO EVENTO RECIBIDO DESDE META ---")
-        print(datos) # Esto nos mostrará el JSON exacto en Render
+        print(datos)
         
-        # Extracción segura y directa del número de teléfono
+        # Extracción ultra-segura del teléfono
+        telefono_cliente = None
         try:
             entry = datos.get("entry", [])[0]
             change = entry.get("changes", [])[0]
             value = change.get("value", {})
             
-            # Buscamos el teléfono ya sea de un mensaje o de un estado de entrega
-            telefono_cliente = None
-            if "messages" in value:
+            # 1. Si es un mensaje de texto entrante del cliente
+            if "messages" in value and value["messages"]:
                 telefono_cliente = value["messages"][0].get("from")
-            elif "statuses" in value:
-                telefono_cliente = value["statuses"][0].get("recipient_id")
-                
-            if telefono_cliente:
+            
+            # 2. Si es un evento de prueba o estado de entrega (Botón de Meta)
+            elif "statuses" in value and value["statuses"]:
+                status_obj = value["statuses"][0]
+                # Probamos todas las variantes posibles donde Meta guarda el teléfono
+                telefono_cliente = status_obj.get("recipient_id") or status_obj.get("id")
+                # Si el ID tiene un formato largo con guion, extraemos solo el número
+                if telefono_cliente and "_" in telefono_cliente:
+                    telefono_cliente = telefono_cliente.split("_")[0]
+            
+            # Si logramos capturar un teléfono válido, respondemos
+            if telefono_cliente and len(str(telefono_cliente)) > 5:
                 print(f"--- ENVIANDO RESPUESTA AUTOMÁTICA AL TELÉFONO: {telefono_cliente} ---")
                 await enviar_respuesta_whatsapp(telefono_cliente)
+            else:
+                print("El evento recibido no contiene un número de teléfono válido para responder.")
                 
         except Exception as e_extract:
-            print(f"No se pudo extraer teléfono de la estructura (evento interno de Meta): {str(e_extract)}")
+            print(f"Aviso en la extracción de datos: {str(e_extract)}")
             
         return Response(content="EVENT_RECEIVED", status_code=200)
     except Exception as e:
