@@ -19,17 +19,19 @@ def inicio():
     return {"status": "ok", "proyecto": "MOTODOMI24-7"}
 
 @app.get("/webhook")
-async def verificar_webhook(request: Request):
-    params = request.query_params
-    mode = params.get("hub.mode")
-    token = params.get("hub.verify_token")
-    challenge = params.get("hub.challenge")
-    
-    if mode and token:
-        if mode == "subscribe" and token == TOKEN_VERIFICACION:
-            print("--- WEBHOOK VERIFICADO CON ÉXITO POR META ---")
-            return PlainTextResponse(content=challenge, status_code=200)
-    return Response(content="Faltan parámetros o token inválido", status_code=400)
+def verificar_webhook(
+    hub_mode: str = None, 
+    hub_verify_token: str = None, 
+    hub_challenge: str = None
+):
+    # Forzamos la lectura directa de los parámetros que envía Meta
+    if hub_mode == "subscribe" and hub_verify_token == TOKEN_VERIFICACION:
+        print("--- WEBHOOK VERIFICADO CON ÉXITO POR META ---")
+        # Devolvemos el reto directamente en formato entero/texto como quiere Meta
+        return int(hub_challenge) if hub_challenge.isdigit() else hub_challenge
+        
+    print("--- INTENTO DE VERIFICACIÓN FALLIDO ---")
+    return PlainTextResponse(content="Token inválido", status_code=403)
 
 @app.post("/webhook")
 async def recibir_mensajes(request: Request):
