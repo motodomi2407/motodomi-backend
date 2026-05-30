@@ -2,7 +2,7 @@
 
 import os
 import httpx
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, Query
 from fastapi.responses import PlainTextResponse
 
 app = FastAPI()
@@ -20,15 +20,14 @@ def inicio():
 
 @app.get("/webhook")
 def verificar_webhook(
-    hub_mode: str = None, 
-    hub_verify_token: str = None, 
-    hub_challenge: str = None
+    hub_mode: str = Query(None, alias="hub.mode"), 
+    hub_verify_token: str = Query(None, alias="hub.verify_token"), 
+    hub_challenge: str = Query(None, alias="hub.challenge")
 ):
-    # Forzamos la lectura directa de los parámetros que envía Meta
+    # Validamos usando los alias correctos con punto que envía Meta
     if hub_mode == "subscribe" and hub_verify_token == TOKEN_VERIFICACION:
         print("--- WEBHOOK VERIFICADO CON ÉXITO POR META ---")
-        # Devolvemos el reto directamente en formato entero/texto como quiere Meta
-        return int(hub_challenge) if hub_challenge.isdigit() else hub_challenge
+        return PlainTextResponse(content=hub_challenge, status_code=200)
         
     print("--- INTENTO DE VERIFICACIÓN FALLIDO ---")
     return PlainTextResponse(content="Token inválido", status_code=403)
@@ -54,9 +53,7 @@ async def recibir_mensajes(request: Request):
             # 2. Si es un evento de prueba o estado de entrega (Botón de Meta)
             elif "statuses" in value and value["statuses"]:
                 status_obj = value["statuses"][0]
-                # Probamos todas las variantes posibles donde Meta guarda el teléfono
                 telefono_cliente = status_obj.get("recipient_id") or status_obj.get("id")
-                # Si el ID tiene un formato largo con guion, extraemos solo el número
                 if telefono_cliente and "_" in telefono_cliente:
                     telefono_cliente = telefono_cliente.split("_")[0]
             
