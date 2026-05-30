@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse
 
 app = FastAPI()
 
-TOKEN_VERIFICACION = "MiCodigoSecretoMotoDomi2026"
+TOKEN_VERIFICACION = "motodomi"
 
 # CREDENCIALES DE META
 PHONE_NUMBER_ID = "1121495151051234"
